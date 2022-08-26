@@ -131,9 +131,44 @@ ORDER BY decade; --final answer after WAY too much time spent on this haha
 SELECT *
 FROM batting;
 
-SELECT playerid, COALESCE(SUM(sb),0), COALESCE(SUM(cs),0), SUM(COALESCE(SUM(sb),0)+COALESCE(SUM(cs),0)) AS total_sb_attempted
-FROM batting
-WHERE IN
-    (SELECT playerid, )
-GROUP BY playerid;
+SELECT yearid, playerid, total_sb_attempted, SUM(sb) AS stolen_bases, SUM(cs) AS caught_stealing, TO_CHAR(sum(sb)/sum(total_sb_attempted)*100, 'fm00D0%') AS percent_sb_successful
+FROM 
+    (SELECT playerid, sb, cs, yearid, (COALESCE(SUM(sb),0)+COALESCE(SUM(cs),0)) AS total_sb_attempted
+    FROM batting
+    GROUP BY playerid, sb, cs, yearid) AS subquery
+WHERE total_sb_attempted > 19 AND yearid = '2016'
+GROUP BY yearid, playerid, total_sb_attempted
+ORDER BY percent_sb_successful DESC; -- code to make sure I'm doing this right with extra columns
 
+SELECT playerid, CONCAT(p.namefirst,' ',p.namelast) AS full_name, TO_CHAR(sum(sb)/sum(total_sb_attempted)*100, 'fm00D0%') AS percent_sb_successful
+FROM 
+    (SELECT playerid, sb, cs, yearid, (COALESCE(SUM(sb),0)+COALESCE(SUM(cs),0)) AS total_sb_attempted
+    FROM batting
+    GROUP BY playerid, sb, cs, yearid) AS subquery
+LEFT JOIN people AS p
+USING (playerid)
+WHERE total_sb_attempted > 19 AND yearid = '2016'
+GROUP BY playerid, full_name
+ORDER BY percent_sb_successful DESC; -- Simplified code for answer with player name
+
+--Q6 Answer: Chris Owings @ 91.3% success
+
+/* Q7
+- From 1970 – 2016, what is the largest number of wins for a team that did not win the world series? 
+- What is the smallest number of wins for a team that did win the world series? Doing this will probably result in an unusually small number of wins for a world series champion – determine why this is the case. 
+- Then redo your query, excluding the problem year. 
+- How often from 1970 – 2016 was it the case that a team with the most wins also won the world series? What percentage of the time?*/
+
+SELECT *
+FROM teams;
+
+SELECT yearid, teamid, w, COALESCE(wswin,'N') as won_world_series
+From teams
+WHERE wswin = 'N'
+    AND yearid BETWEEN 1970 AND 2016
+ORDER BY w DESC, yearid; -- largest # of dubs for not winning the big dance
+
+
+
+
+--Q7 Answer: 116 wins; 
