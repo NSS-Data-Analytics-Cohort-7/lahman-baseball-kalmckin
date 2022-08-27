@@ -154,21 +154,63 @@ ORDER BY percent_sb_successful DESC; -- Simplified code for answer with player n
 --Q6 Answer: Chris Owings @ 91.3% success
 
 /* Q7
-- From 1970 – 2016, what is the largest number of wins for a team that did not win the world series? 
-- What is the smallest number of wins for a team that did win the world series? Doing this will probably result in an unusually small number of wins for a world series champion – determine why this is the case. 
-- Then redo your query, excluding the problem year. 
-- How often from 1970 – 2016 was it the case that a team with the most wins also won the world series? What percentage of the time?*/
+a. From 1970 – 2016, what is the largest number of wins for a team that did not win the world series? 
+b. What is the smallest number of wins for a team that did win the world series? Doing this will probably result in an unusually small number of wins for a world series champion – determine why this is the case. 
+c. Then redo your query, excluding the problem year. 
+d. How often from 1970 – 2016 was it the case that a team with the most wins also won the world series?
+e. What percentage of the time?*/
 
 SELECT *
 FROM teams;
 
-SELECT yearid, teamid, w, COALESCE(wswin,'N') as won_world_series
+SELECT yearid, teamid, SUM(w) as total_wins
 From teams
 WHERE wswin = 'N'
     AND yearid BETWEEN 1970 AND 2016
-ORDER BY w DESC, yearid; -- largest # of dubs for not winning the big dance
+group by yearid, teamid
+ORDER BY total_wins DESC; -- largest # of dubs for not winning the big dance that year
+
+SELECT yearid, teamid, SUM(w) as total_wins
+From teams
+WHERE wswin = 'Y'
+    AND yearid BETWEEN 1970 AND 2016
+group by yearid, teamid
+ORDER BY total_wins; -- smallest # of dubs for actually winning the big dance including strike year
+
+SELECT *
+From teams
+WHERE yearid = 1981
+
+SELECT yearid, teamid, SUM(w) as total_wins
+From teams
+WHERE wswin = 'Y'
+    AND yearid BETWEEN 1970 AND 2016
+    AND yearid != 1981
+group by yearid, teamid
+ORDER BY total_wins ASC; -- Query redone excluding 1981
 
 
 
+WITH max_wins_by_year AS
+    (SELECT yearid, MAX(w) as max_wins
+    FROM teams
+    GROUP BY yearid)
 
---Q7 Answer: 116 wins; 
+SELECT COUNT(teamid) AS max_and_wswin
+FROM(
+    SELECT t.yearid, t.teamid, t.w, mw.max_wins
+    FROM teams AS t
+    LEFT JOIN max_wins_by_year AS mw
+    USING (yearid)
+    WHERE t.w = mw.max_wins
+    AND wswin = 'Y'
+    GROUP BY t.yearid, t.teamid, t.w, mw.max_wins) AS checker -- # of times a team had max points AND won the world series for that year
+
+
+
+/* Q7 Answer: 
+A. 2001/SEA/116 wins
+B. 1981/LAN/63 -- MLB strike in 1981, 713 games cancelled
+C. Excluding 1981, 2006/SLN/83 wins
+D. 50 times
+E. 
