@@ -206,6 +206,26 @@ FROM(
     AND wswin = 'Y'
     GROUP BY t.yearid, t.teamid, t.w, mw.max_wins) AS checker -- # of times a team had max points AND won the world series for that year
 
+WITH max_wins_by_year AS
+    (SELECT yearid, CAST(MAX(w) AS NUMERIC) as max_wins
+    FROM teams
+    GROUP BY yearid),
+    
+    num_of_season AS
+    (SELECT yearid, teamid, CAST(COUNT(DISTINCT yearid) AS NUMERIC) as seasons
+    FROM teams
+    GROUP BY yearid, teamid)
+
+SELECT CAST(COUNT(teamid) AS NUMERIC) AS max_and_wswin
+FROM(
+    SELECT t.yearid, t.teamid, t.w, mw.max_wins
+    FROM teams AS t
+    LEFT JOIN max_wins_by_year AS mw
+    USING (yearid)
+    WHERE t.w = mw.max_wins
+    AND wswin = 'Y'
+    GROUP BY t.yearid, t.teamid, t.w, mw.max_wins) AS checker -- UNFINISHED, TAKING A BREAK, COME BACK TO 
+
 
 
 /* Q7 Answer: 
@@ -213,4 +233,107 @@ A. 2001/SEA/116 wins
 B. 1981/LAN/63 -- MLB strike in 1981, 713 games cancelled
 C. Excluding 1981, 2006/SLN/83 wins
 D. 50 times
-E. 
+E. */
+
+--Q8 Using the attendance figures from the homegames table, find the teams and parks which had the top 5 average attendance per game in 2016 (where average attendance is defined as total attendance divided by number of games). Only consider parks where there were at least 10 games played. Report the park name, team name, and average attendance. Repeat for the lowest 5 average attendance.
+
+SELECT *
+FROM homegames;
+
+SELECT *
+FROM teams;
+
+SELECT *
+FROM parks;
+
+SELECT park, SUM(games)
+FROM homegames
+GROUP BY park; 
+
+SELECT team, park, SUM(attendance)/SUM(games) AS avg_attendance
+FROM homegames
+WHERE year = 2016
+GROUP BY team, park
+ORDER BY avg_attendance DESC
+LIMIT 5 --attendance per game per team
+
+
+SELECT h.team, t.name, h.park, p.park_name, SUM(h.attendance)/SUM(h.games) AS avg_attendance
+FROM homegames as h
+LEFT JOIN teams AS t
+   ON h.team = t.teamid
+LEFT JOIN parks AS p
+    ON h.park = p.park
+WHERE year = 2016
+GROUP BY h.team, t.name, h.park, p.park_name
+ORDER BY avg_attendance DESC
+LIMIT 5 --attendance per game per team
+
+
+SELECT h.team, t.name, h.park, p.park_name, SUM(h.attendance)/SUM(h.games) AS avg_attendance
+FROM homegames as h
+LEFT JOIN teams AS t
+   ON h.team = t.teamid
+LEFT JOIN parks AS p
+    ON h.park = p.park
+WHERE year = 2016
+    AND t.name != 'St. Louis Browns'
+    AND t.name != 'St. Louis Perfectos'
+GROUP BY h.team, t.name, h.park, p.park_name
+ORDER BY avg_attendance DESC
+LIMIT 5 --attendance per game per team with STL names deduped
+
+
+WITH total_games_per_park AS
+(SELECT park, year, SUM(games) AS park_games
+FROM homegames
+GROUP BY park, year
+HAVING SUM(games) > 9 AND year = 2016)
+
+SELECT h.team, t.name, h.park, p.park_name, SUM(h.attendance)/SUM(h.games) AS avg_attendance, MIN(park_games)
+FROM homegames as h
+LEFT JOIN teams AS t
+   ON h.team = t.teamid
+LEFT JOIN parks AS p
+    ON h.park = p.park
+INNER JOIN total_games_per_park
+    on total_games_per_park.park = h.park
+WHERE h.year = 2016
+    AND t.name != 'St. Louis Browns'
+    AND t.name != 'St. Louis Perfectos'
+GROUP BY h.team, t.name, h.park, p.park_name, park_games
+ORDER BY avg_attendance DESC
+LIMIT 5 --qUERY FOR TOP 5 AVG
+
+
+
+WITH total_games_per_park AS
+(SELECT park, year, SUM(games) AS park_games
+FROM homegames
+GROUP BY park, year
+HAVING SUM(games) > 9 AND year = 2016)
+
+SELECT h.team, 
+    (CASE WHEN t.name LIKE 'Cleveland%' THEN 'Cleveland Indians' 
+    WHEN t.name LIKE 'Tampa%' THEN 'Tampa Bay Rays'
+    WHEN t.name LIKE 'St. Louis%' THEN 'St. Louis Cardinals'
+    ELSE t.name
+    END) AS name_corrected,
+    h.park, p.park_name, SUM(h.attendance)/SUM(h.games) AS avg_attendance, MIN(park_games)
+FROM homegames as h
+LEFT JOIN teams AS t
+   ON h.team = t.teamid
+LEFT JOIN parks AS p
+    ON h.park = p.park
+INNER JOIN total_games_per_park
+    on total_games_per_park.park = h.park
+WHERE h.year = 2016
+    AND t.name != 'St. Louis Browns'
+    AND t.name != 'St. Louis Perfectos'
+    AND t.name != 'Tampa Bay Rays'
+    AND t.name != 'Cleveland Naps'
+GROUP BY h.team, name_corrected, h.park, p.park_name, park_games
+ORDER BY avg_attendance ASC
+LIMIT 5 --Query for bottom 5 avg
+
+--Q8 Answer: In last two codes
