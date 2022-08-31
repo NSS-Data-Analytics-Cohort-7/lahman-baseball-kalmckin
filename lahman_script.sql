@@ -337,3 +337,56 @@ ORDER BY avg_attendance ASC
 LIMIT 5 --Query for bottom 5 avg
 
 --Q8 Answer: In last two codes
+
+--Q9 Which managers have won the TSN Manager of the Year award in both the National League (NL) and the American League (AL)? Give their full name and the teams that they were managing when they won the award.
+
+SELECT *
+FROM managers;
+
+WITH al_win AS
+    (SELECT *
+    FROM awardsmanagers
+     WHERE yearid = 1985
+    WHERE awardid LIKE 'TSN%'
+        AND lgid = 'AL'),
+    
+    nl_win AS 
+    (SELECT *
+    FROM awardsmanagers
+    WHERE awardid LIKE 'TSN%'
+        AND lgid = 'NL')
+SELECT *
+FROM awardsmanagers AS a
+INNER JOIN al_win
+USING (playerid)
+INNER JOIN nl_win
+ON nl_win.playerid = al_win.playerid
+WHERE a.awardid LIKE 'TSN%' -- probably overcomplicated here
+
+SELECT a1.playerid, CONCAT(p.namefirst,' ',p.namelast) AS full_name, a1.awardid, a2.lgid, a3.lgid
+FROM awardsmanagers AS a1
+JOIN awardsmanagers AS a2
+ON a1.playerid = a2.playerid AND a2.lgid = 'NL'
+JOIN awardsmanagers AS a3
+ON a2.playerid = a3.playerid AND a3.lgid = 'AL'
+LEFT JOIN people as p
+ON a1.playerid = p.playerid
+WHERE a1.awardid LIKE 'TSN%'
+ORDER BY a1.playerid -- CODE WORKS, NEED TO FIND THE SAME YEAR
+
+WITH team_name AS
+(SELECT *
+FROM teams
+LEFT JOIN managers
+USING (teamid))
+
+SELECT DISTINCT a1.playerid, CONCAT(p.namefirst,' ',p.namelast) AS full_name, a2.awardid, a2.yearid AS NL_year, a2.lgid, a3.yearid AS AL_year, a3.lgid
+FROM awardsmanagers AS a1
+JOIN awardsmanagers AS a2
+ON a1.playerid = a2.playerid AND a2.lgid = 'NL'
+JOIN awardsmanagers AS a3
+ON a2.playerid = a3.playerid AND a3.lgid = 'AL'
+LEFT JOIN people as p
+ON a1.playerid = p.playerid
+WHERE a2.awardid = 'TSN Manager of the Year' AND a3.awardid = 'TSN Manager of the Year'
+ORDER BY a1.playerid -- not necessary
