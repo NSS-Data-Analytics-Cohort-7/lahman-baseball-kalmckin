@@ -340,53 +340,62 @@ LIMIT 5 --Query for bottom 5 avg
 
 --Q9 Which managers have won the TSN Manager of the Year award in both the National League (NL) and the American League (AL)? Give their full name and the teams that they were managing when they won the award.
 
-SELECT *
-FROM managers;
+WITH al_team_name AS
+(SELECT DISTINCT t.teamid, m.playerid, am.lgid, am.yearid, am.awardid, t.name
+FROM teams AS t
+LEFT JOIN managers AS m
+USING (teamid)
+INNER JOIN awardsmanagers as am
+ON m.playerid = am.playerid AND m.yearid = am.yearid
+WHERE am.lgid = 'AL' AND am.awardid = 'TSN Manager of the Year'),
 
-WITH al_win AS
-    (SELECT *
-    FROM awardsmanagers
-     WHERE yearid = 1985
-    WHERE awardid LIKE 'TSN%'
-        AND lgid = 'AL'),
-    
-    nl_win AS 
-    (SELECT *
-    FROM awardsmanagers
-    WHERE awardid LIKE 'TSN%'
-        AND lgid = 'NL')
-SELECT *
-FROM awardsmanagers AS a
-INNER JOIN al_win
+nl_team_name AS
+(SELECT DISTINCT t.teamid, m.playerid, am.lgid, am.yearid, am.awardid, t.name
+FROM teams AS t
+LEFT JOIN managers AS m
+USING (teamid)
+INNER JOIN awardsmanagers as am
+ON m.playerid = am.playerid AND m.yearid = am.yearid
+WHERE am.lgid = 'NL' AND am.awardid = 'TSN Manager of the Year')
+
+SELECT DISTINCT a2.playerid, CONCAT(p.namefirst,' ',p.namelast) AS full_name, a2.awardid, a2.yearid AS NL_year, nltn.name AS NL_team_name, a2.lgid, a3.yearid AS AL_year, altn.name AS al_team_name, a3.lgid
+FROM awardsmanagers AS a1
+JOIN awardsmanagers AS a2
+ON a1.playerid = a2.playerid AND a2.lgid = 'NL'
+JOIN awardsmanagers AS a3
+ON a2.playerid = a3.playerid AND a3.lgid = 'AL'
+LEFT JOIN people as p
+ON a1.playerid = p.playerid
+LEFT JOIN al_team_name as altn
+ON altn.playerid = a3.playerid
+LEFT JOIN nl_team_name as nltn
+ON nltn.playerid = a2.playerid
+WHERE a2.awardid = 'TSN Manager of the Year' AND a3.awardid = 'TSN Manager of the Year' --- FINAL CODE FOR ANSWER AFTER WHAT SEEMED LIKE 17 HOURS
+
+-- Find all players who hit their career highest number of home runs in 2016. Consider only players who have played in the league for at least 10 years, and who hit at least one home run in 2016. Report the players' first and last names and the number of home runs they hit in 2016.
+
+WITH ten_yr_played AS
+(SELECT playerid, COUNT(yearid)
+FROM batting
+GROUP BY playerid
+HAVING COUNT(yearid) > 9),
+
+career_high_hr AS
+(SELECT playerid, MAX(hr) AS career_high
+FROM batting
+GROUP BY playerid)
+
+SELECT DISTINCT CONCAT(p.namefirst,' ',p.namelast) AS full_name, b.yearid, SUM(HR) as season_hr, chh.career_high  
+FROM batting as b
+INNER JOIN ten_yr_played AS typ
 USING (playerid)
-INNER JOIN nl_win
-ON nl_win.playerid = al_win.playerid
-WHERE a.awardid LIKE 'TSN%' -- probably overcomplicated here
+LEFT JOIN career_high_hr AS chh
+USING (playerid)
+INNER JOIN people as p
+USING (playerid)
+WHERE b.yearid = 2016
+GROUP BY full_name, yearid, chh.career_high
+HAVING SUM(HR) = chh.career_high AND SUM(HR) != 0 
+ORDER BY season_hr DESC -- Final code for answer
 
-SELECT a1.playerid, CONCAT(p.namefirst,' ',p.namelast) AS full_name, a1.awardid, a2.lgid, a3.lgid
-FROM awardsmanagers AS a1
-JOIN awardsmanagers AS a2
-ON a1.playerid = a2.playerid AND a2.lgid = 'NL'
-JOIN awardsmanagers AS a3
-ON a2.playerid = a3.playerid AND a3.lgid = 'AL'
-LEFT JOIN people as p
-ON a1.playerid = p.playerid
-WHERE a1.awardid LIKE 'TSN%'
-ORDER BY a1.playerid -- CODE WORKS, NEED TO FIND THE SAME YEAR
-
-WITH team_name AS
-(SELECT *
-FROM teams
-LEFT JOIN managers
-USING (teamid))
-
-SELECT DISTINCT a1.playerid, CONCAT(p.namefirst,' ',p.namelast) AS full_name, a2.awardid, a2.yearid AS NL_year, a2.lgid, a3.yearid AS AL_year, a3.lgid
-FROM awardsmanagers AS a1
-JOIN awardsmanagers AS a2
-ON a1.playerid = a2.playerid AND a2.lgid = 'NL'
-JOIN awardsmanagers AS a3
-ON a2.playerid = a3.playerid AND a3.lgid = 'AL'
-LEFT JOIN people as p
-ON a1.playerid = p.playerid
-WHERE a2.awardid = 'TSN Manager of the Year' AND a3.awardid = 'TSN Manager of the Year'
-ORDER BY a1.playerid -- not necessary
+--Is there any correlation between number of wins and team salary? Use data from 2000 and later to answer this question. As you do this analysis, keep in mind that salaries across the whole league tend to increase together, so you may want to look on a year-by-year basis.
