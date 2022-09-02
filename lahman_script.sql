@@ -206,34 +206,92 @@ FROM(
     AND wswin = 'Y'
     GROUP BY t.yearid, t.teamid, t.w, mw.max_wins) AS checker -- # of times a team had max points AND won the world series for that year
 
-WITH max_wins_by_year AS
-    (SELECT yearid, CAST(MAX(w) AS NUMERIC) as max_wins
-    FROM teams
-    GROUP BY yearid),
-    
-    num_of_season AS
-    (SELECT yearid, teamid, CAST(COUNT(DISTINCT yearid) AS NUMERIC) as seasons
-    FROM teams
-    GROUP BY yearid, teamid)
+SELECT *
+from teams
 
-SELECT CAST(COUNT(teamid) AS NUMERIC) AS max_and_wswin
-FROM(
-    SELECT t.yearid, t.teamid, t.w, mw.max_wins
-    FROM teams AS t
-    LEFT JOIN max_wins_by_year AS mw
-    USING (yearid)
-    WHERE t.w = mw.max_wins
-    AND wswin = 'Y'
-    GROUP BY t.yearid, t.teamid, t.w, mw.max_wins) AS checker -- UNFINISHED, TAKING A BREAK, COME BACK TO 
+    WITH max_wins_by_year AS
+        (SELECT yearid, MAX(sum_wins) as max_wins
+        FROM 
+         (SELECT yearid, teamid, sum(w) AS sum_wins
+         FROM teams
+         GROUP BY yearid, teamid
+         ORDER BY teamid) as sq
+        GROUP BY yearid),
+
+     ws_win AS
+     (SELECT yearid, teamid, wswin
+     FROM teams
+     WHERE wswin = 'Y'),
+
+     season_wins AS
+     (SELECT yearid, teamid, SUM(w) as sum_wins
+     FROM teams
+     GROUP BY yearid, teamid)
+ 
+SELECT DISTINCT mw.yearid, ws.teamid, mw.max_wins, sw.sum_wins, ws.wswin
+FROM teams as t
+INNER JOIN max_wins_by_year as mw
+ON mw.yearid = t.yearid
+INNER JOIN ws_win AS ws
+ON ws.yearid = mw.yearid
+INNER JOIN season_wins as sw
+ON sw.teamid = ws.teamid
+WHERE sw.sum_wins = mw.max_wins AND mw.yearid = sw.yearid AND t.wswin = 'Y'
+ORDER BY yearid --#of times a team had max points AND won the world series for that year with team names
 
 
+    WITH max_wins_by_year AS
+        (SELECT yearid, MAX(sum_wins) as max_wins
+        FROM 
+         (SELECT yearid, teamid, sum(w) AS sum_wins
+         FROM teams
+         GROUP BY yearid, teamid
+         ORDER BY teamid) as sq
+        GROUP BY yearid),
+
+     ws_win AS
+     (SELECT yearid, teamid, wswin
+     FROM teams
+     WHERE wswin = 'Y'),
+
+     season_wins AS
+     (SELECT yearid, teamid, SUM(w) as sum_wins
+     FROM teams
+     GROUP BY yearid, teamid),
+ 
+    num_of_years AS
+    (Select COUNT(DISTINCT yearid) AS num_years
+    FROM teams),
+
+    num_ws_and_max AS
+         (SELECT DISTINCT mw.yearid, ws.teamid, mw.max_wins, sw.sum_wins, ws.wswin
+        FROM teams as t
+        INNER JOIN max_wins_by_year as mw
+        ON mw.yearid = t.yearid
+        INNER JOIN ws_win AS ws
+        ON ws.yearid = mw.yearid
+        INNER JOIN season_wins as sw
+        ON sw.teamid = ws.teamid
+        WHERE sw.sum_wins = mw.max_wins AND mw.yearid = sw.yearid AND t.wswin = 'Y')
+
+SELECT TO_CHAR(CAST(count(DISTINCT t.yearid) AS NUMERIC)/CAST(COUNT(nwm.teamid) AS NUMERIC)*100, 'fm00D00%') AS perc_of_time
+FROM teams as t
+INNER JOIN max_wins_by_year as mw
+ON mw.yearid = t.yearid
+INNER JOIN ws_win AS ws
+ON ws.yearid = mw.yearid
+INNER JOIN season_wins as sw
+ON sw.teamid = ws.teamid
+INNER JOIN num_ws_and_max AS nwm
+ON nwm.teamid = t.teamid
+WHERE sw.sum_wins = mw.max_wins AND mw.yearid = sw.yearid AND t.wswin = 'Y' - -- % of time has both highest wins and won world series
 
 /* Q7 Answer: 
 A. 2001/SEA/116 wins
 B. 1981/LAN/63 -- MLB strike in 1981, 713 games cancelled
 C. Excluding 1981, 2006/SLN/83 wins
 D. 50 times
-E. */
+E. 11.16% */
 
 --Q8 Using the attendance figures from the homegames table, find the teams and parks which had the top 5 average attendance per game in 2016 (where average attendance is defined as total attendance divided by number of games). Only consider parks where there were at least 10 games played. Report the park name, team name, and average attendance. Repeat for the lowest 5 average attendance.
 
@@ -374,28 +432,42 @@ WHERE a2.awardid = 'TSN Manager of the Year' AND a3.awardid = 'TSN Manager of th
 
 -- Find all players who hit their career highest number of home runs in 2016. Consider only players who have played in the league for at least 10 years, and who hit at least one home run in 2016. Report the players' first and last names and the number of home runs they hit in 2016.
 
+
 WITH ten_yr_played AS
-(SELECT playerid, COUNT(yearid)
+(SELECT playerid, p.debut, p.finalgame, DATE_PART('year',TO_DATE(p.finalgame, 'YYYY MM DD')::date) - DATE_PART('year',TO_DATE(p.debut, 'YYYY MM DD')::date) AS years_played
 FROM batting
-GROUP BY playerid
-HAVING COUNT(yearid) > 9),
+LEFT JOIN people as p
+USING(playerid)
+GROUP BY playerid, p.debut, p.finalgame
+HAVING DATE_PART('year',TO_DATE(p.finalgame, 'YYYY MM DD')::date) - DATE_PART('year',TO_DATE(p.debut, 'YYYY MM DD')::date) > 9),
 
 career_high_hr AS
 (SELECT playerid, MAX(hr) AS career_high
-FROM batting
-GROUP BY playerid)
+FROM
+    (SELECT yearid, playerid, sum(hr) AS hr
+    FROM batting
+    GROUP BY yearid, playerid) AS sq
+ GROUP BY playerid),
 
-SELECT DISTINCT CONCAT(p.namefirst,' ',p.namelast) AS full_name, b.yearid, SUM(HR) as season_hr, chh.career_high  
+season_hr_table AS
+(SELECT DISTINCT yearid, playerid, SUM(hr) AS season_hr
+ FROM batting
+ WHERE yearid = 2016
+GROUP BY yearid, playerid)
+
+
+SELECT b.yearid, b.playerid, CONCAT(p.namefirst,' ',p.namelast) AS full_name, sht.season_hr, chh.career_high  
 FROM batting as b
 INNER JOIN ten_yr_played AS typ
 USING (playerid)
 LEFT JOIN career_high_hr AS chh
 USING (playerid)
+LEFT JOIN season_hr_table AS sht
+USING (playerid)
 INNER JOIN people as p
 USING (playerid)
-WHERE b.yearid = 2016
-GROUP BY full_name, yearid, chh.career_high
-HAVING SUM(HR) = chh.career_high AND SUM(HR) != 0 
-ORDER BY season_hr DESC -- Final code for answer
+WHERE b.yearid = 2016 AND sht.season_hr = chh.career_high AND sht.season_hr != 0
+GROUP BY b.yearid, playerid, full_name, sht.season_hr, chh.career_high -- final code for answer
 
---Is there any correlation between number of wins and team salary? Use data from 2000 and later to answer this question. As you do this analysis, keep in mind that salaries across the whole league tend to increase together, so you may want to look on a year-by-year basis.
+-- Q11 Is there any correlation between number of wins and team salary? Use data from 2000 and later to answer this question. As you do this analysis, keep in mind that salaries across the whole league tend to increase together, so you may want to look on a year-by-year basis.
+
