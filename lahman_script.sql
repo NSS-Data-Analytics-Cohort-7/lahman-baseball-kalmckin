@@ -6,7 +6,7 @@ FROM appearances;
 SELECT MIN(yearid), MAX(yearid)
 FROM appearances;
 
---Q1 Answer: 1871-2016
+--Q1 Answer: 1871-2016 --- Walkthrough Answer: Correct
 
 --Q2 Find the name and height of the shortest player in the database. How many games did he play in? What is the name of the team for which he played?
 SELECT *
@@ -33,7 +33,7 @@ WHERE height IN
 SELECT *
 FROM teams;
 
-SELECT DISTINCT CONCAT(p.namefirst,' ',p.namelast) AS full_name, p.height, SUM(a.g_all) AS games_played, t.name AS team_name
+SELECT DISTINCT CONCAT(p.namefirst,' ',p.namelast) AS full_name, p.height, g_all AS games_played, t.name AS team_name
 FROM people AS p
 LEFT JOIN appearances AS a
 USING (playerid)
@@ -41,8 +41,8 @@ LEFT JOIN teams as t
 USING (teamid)
 WHERE height IN
     (SELECT MIN(height)
-    FROM people) --Final Code for Answer
-GROUP BY full_name, p.height, team_name;    
+    FROM people) 
+GROUP BY full_name, p.height, team_name, games_played; --Final Code for Answer -- Walkthrough Answer: I had the code before this correct, but somehow did a SUM on the final code for games played.    
 --Q2 Answer: Eddie Gaedel; 43in; 52 games; St. Louis Browns
 
 --Q3 Find all players in the database who played at Vanderbilt University. Create a list showing each player’s first and last names as well as the total salary they earned in the major leagues. Sort this list in descending order by the total salary earned. Which Vanderbilt player earned the most money in the majors?
@@ -72,7 +72,7 @@ LEFT JOIN salaries as sa
 USING (playerid)
 WHERE s.schoolname LIKE 'Vand%'
 GROUP BY first_name, last_name, playerid,s.schoolname
-ORDER BY total_salary DESC; -- Final Code for Answer
+ORDER BY total_salary DESC; -- Final Code for Answer -- Walkthrough Answer: You're getting duplicates because when you join collegplaying, it's pulling in a row for every year they played in college. Using a subquery in the FROM or WHERE would have eliminated the duplicates. Salary should be $81M
 
 --Q3 Answer: Most Earned = David Price @$245,553,888
 
@@ -89,10 +89,10 @@ SELECT
         WHEN pos LIKE 'P' OR pos LIKE 'C' THEN 'Battery'
         ELSE 'OTHER'
         END AS pos_long_name, 
-        COUNT(PO) AS put_outs
+  COUNT(PO) AS put_outs
 FROM fielding
 WHERE yearid = 2016
-GROUP BY pos_long_name;
+GROUP BY pos_long_name; -- Walkthrough Answer: you should have used a sum not a count, your numbers are too low. 
 
 --Q4 Answer: Battery - 938; Infield - 661; Outfield - 354
 
@@ -114,7 +114,8 @@ WHERE playerid = 'altroni01'; -- duplicate checK
 SELECT *
 FROM teams;
 
-SELECT concat(decade,'-', decade +9) AS year, ROUND((subquery.total_SOs/subquery.total_games)/2.00,2) AS avg_strikeouts_per_game, ROUND((subquery.total_HRs/subquery.total_games)/2.00,2) AS avg_homeruns_per_game
+SELECT concat(decade,'-', decade +9) AS year, 
+    ROUND(subquery.total_SOs/(subquery.total_games/2.00),2) AS avg_strikeouts_per_game,                       ROUND(subquery.total_HRs/(subquery.total_games/2.00),2) AS avg_homeruns_per_game
 FROM
     (SELECT SUM(so)/1.00 as total_SOs, SUM(g)/1.00 AS total_games, SUM(hr)/1.00 AS total_HRs, FLOOR(yearid/ 10)* 10 as decade
     FROM teams
@@ -122,7 +123,7 @@ FROM
     GROUP BY decade
     ORDER BY decade) AS subquery
 GROUP BY decade, avg_strikeouts_per_game, avg_homeruns_per_game
-ORDER BY decade; --final answer after WAY too much time spent on this haha
+ORDER BY decade; --WRONG answer after WAY too much time spent on this - I divided by 2 too soon and had my parenthesis in the wrong place. 
 
 --Q5 Answer: Homeruns go up even as SOs do as well. 
 
@@ -140,7 +141,9 @@ WHERE total_sb_attempted > 19 AND yearid = '2016'
 GROUP BY yearid, playerid, total_sb_attempted
 ORDER BY percent_sb_successful DESC; -- code to make sure I'm doing this right with extra columns
 
-SELECT playerid, CONCAT(p.namefirst,' ',p.namelast) AS full_name, TO_CHAR(sum(sb)/sum(total_sb_attempted)*100, 'fm00D0%') AS percent_sb_successful
+SELECT playerid, 
+CONCAT(p.namefirst,' ',p.namelast) AS full_name, 
+TO_CHAR(sum(sb)/sum(total_sb_attempted)*100, 'fm00D0%') AS percent_sb_successful
 FROM 
     (SELECT playerid, sb, cs, yearid, (COALESCE(SUM(sb),0)+COALESCE(SUM(cs),0)) AS total_sb_attempted
     FROM batting
@@ -202,7 +205,7 @@ FROM(
     FROM teams AS t
     LEFT JOIN max_wins_by_year AS mw
     USING (yearid)
-    WHERE t.w = mw.max_wins
+    WHERE t.w = mw.max_wins AND yearid >= 1970 AND yearid <=2016
     AND wswin = 'Y'
     GROUP BY t.yearid, t.teamid, t.w, mw.max_wins) AS checker -- # of times a team had max points AND won the world series for that year
 
@@ -236,7 +239,7 @@ INNER JOIN ws_win AS ws
 ON ws.yearid = mw.yearid
 INNER JOIN season_wins as sw
 ON sw.teamid = ws.teamid
-WHERE sw.sum_wins = mw.max_wins AND mw.yearid = sw.yearid AND t.wswin = 'Y'
+WHERE sw.sum_wins = mw.max_wins AND mw.yearid = sw.yearid AND t.wswin = 'Y' AND t.yearid >= 1970 AND t.yearid <=2016
 ORDER BY yearid --#of times a team had max points AND won the world series for that year with team names
 
 
@@ -252,7 +255,7 @@ ORDER BY yearid --#of times a team had max points AND won the world series for t
      ws_win AS
      (SELECT yearid, teamid, wswin
      FROM teams
-     WHERE wswin = 'Y'),
+     WHERE wswin = 'Y' AND t.yearid >= 1970 AND t.yearid <=2016),
 
      season_wins AS
      (SELECT yearid, teamid, SUM(w) as sum_wins
@@ -272,7 +275,7 @@ ORDER BY yearid --#of times a team had max points AND won the world series for t
         ON ws.yearid = mw.yearid
         INNER JOIN season_wins as sw
         ON sw.teamid = ws.teamid
-        WHERE sw.sum_wins = mw.max_wins AND mw.yearid = sw.yearid AND t.wswin = 'Y')
+        WHERE sw.sum_wins = mw.max_wins AND mw.yearid = sw.yearid AND t.wswin = 'Y' AND t.yearid >= 1970 AND t.yearid <=2016)
 
 SELECT TO_CHAR(CAST(count(DISTINCT t.yearid) AS NUMERIC)/CAST(COUNT(nwm.teamid) AS NUMERIC)*100, 'fm00D00%') AS perc_of_time
 FROM teams as t
@@ -284,14 +287,14 @@ INNER JOIN season_wins as sw
 ON sw.teamid = ws.teamid
 INNER JOIN num_ws_and_max AS nwm
 ON nwm.teamid = t.teamid
-WHERE sw.sum_wins = mw.max_wins AND mw.yearid = sw.yearid AND t.wswin = 'Y' - -- % of time has both highest wins and won world series
+WHERE sw.sum_wins = mw.max_wins AND mw.yearid = sw.yearid AND t.wswin = 'Y' AND t.yearid >= 1970 AND t.yearid <=2016 - -- % of time has both highest wins and won world series
 
 /* Q7 Answer: 
 A. 2001/SEA/116 wins
 B. 1981/LAN/63 -- MLB strike in 1981, 713 games cancelled
 C. Excluding 1981, 2006/SLN/83 wins
-D. 50 times
-E. 11.16% */
+D. 50 times - Walkthrough Answer: should be 12 times, I left out the 1970 - 2016 filter
+E. 11.16% -- Walthrough answer: should be 26% bc of leaving out year filter above. Haven't fixed code yet. */
 
 --Q8 Using the attendance figures from the homegames table, find the teams and parks which had the top 5 average attendance per game in 2016 (where average attendance is defined as total attendance divided by number of games). Only consider parks where there were at least 10 games played. Report the park name, team name, and average attendance. Repeat for the lowest 5 average attendance.
 
@@ -335,8 +338,8 @@ LEFT JOIN teams AS t
 LEFT JOIN parks AS p
     ON h.park = p.park
 WHERE year = 2016
-    AND t.name != 'St. Louis Browns'
-    AND t.name != 'St. Louis Perfectos'
+--     AND t.name != 'St. Louis Browns'
+--     AND t.name != 'St. Louis Perfectos'
 GROUP BY h.team, t.name, h.park, p.park_name
 ORDER BY avg_attendance DESC
 LIMIT 5 --attendance per game per team with STL names deduped
@@ -351,14 +354,14 @@ HAVING SUM(games) > 9 AND year = 2016)
 SELECT h.team, t.name, h.park, p.park_name, SUM(h.attendance)/SUM(h.games) AS avg_attendance, MIN(park_games)
 FROM homegames as h
 LEFT JOIN teams AS t
-   ON h.team = t.teamid
+   ON h.team = t.teamid and h.year = t.yearid
 LEFT JOIN parks AS p
     ON h.park = p.park
 INNER JOIN total_games_per_park
     on total_games_per_park.park = h.park
 WHERE h.year = 2016
-    AND t.name != 'St. Louis Browns'
-    AND t.name != 'St. Louis Perfectos'
+--     AND t.name != 'St. Louis Browns'
+--     AND t.name != 'St. Louis Perfectos'
 GROUP BY h.team, t.name, h.park, p.park_name, park_games
 ORDER BY avg_attendance DESC
 LIMIT 5 --qUERY FOR TOP 5 AVG
@@ -411,7 +414,7 @@ nl_team_name AS
 (SELECT DISTINCT t.teamid, m.playerid, am.lgid, am.yearid, am.awardid, t.name
 FROM teams AS t
 LEFT JOIN managers AS m
-USING (teamid)
+ON t.teamid = m.teamid AND t.yearid = m.yearid
 INNER JOIN awardsmanagers as am
 ON m.playerid = am.playerid AND m.yearid = am.yearid
 WHERE am.lgid = 'NL' AND am.awardid = 'TSN Manager of the Year')
@@ -423,12 +426,12 @@ ON a1.playerid = a2.playerid AND a2.lgid = 'NL'
 JOIN awardsmanagers AS a3
 ON a2.playerid = a3.playerid AND a3.lgid = 'AL'
 LEFT JOIN people as p
-ON a1.playerid = p.playerid
+ON a1.playerid = p.playerid 
 LEFT JOIN al_team_name as altn
 ON altn.playerid = a3.playerid
 LEFT JOIN nl_team_name as nltn
 ON nltn.playerid = a2.playerid
-WHERE a2.awardid = 'TSN Manager of the Year' AND a3.awardid = 'TSN Manager of the Year' --- FINAL CODE FOR ANSWER AFTER WHAT SEEMED LIKE 17 HOURS
+WHERE a2.awardid = 'TSN Manager of the Year' AND a3.awardid = 'TSN Manager of the Year' --- FINAL CODE FOR ANSWER AFTER WHAT SEEMED LIKE 17 HOURS Walkthrough Anser: Still got it wrong. Had to add an additional key for yearid to remove the duplicates I didn't notice were there. 
 
 -- Find all players who hit their career highest number of home runs in 2016. Consider only players who have played in the league for at least 10 years, and who hit at least one home run in 2016. Report the players' first and last names and the number of home runs they hit in 2016.
 
@@ -470,4 +473,5 @@ WHERE b.yearid = 2016 AND sht.season_hr = chh.career_high AND sht.season_hr != 0
 GROUP BY b.yearid, playerid, full_name, sht.season_hr, chh.career_high -- final code for answer
 
 -- Q11 Is there any correlation between number of wins and team salary? Use data from 2000 and later to answer this question. As you do this analysis, keep in mind that salaries across the whole league tend to increase together, so you may want to look on a year-by-year basis.
+
 
